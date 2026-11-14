@@ -10,6 +10,7 @@ import Settings from './components/Settings'
 import EarthMap from './components/EarthMap'
 import TrendChart from './components/TrendChart'
 import IndicatorAnalysis from './components/IndicatorAnalysis'
+import NdviReview from './components/NdviReview'
 
 const fmt = (v, d = 1) => Number(v ?? 0).toFixed(d)
 const initials = n => (n || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()
@@ -74,6 +75,7 @@ export default function App() {
         if (!globalLocation) throw new Error('No areas with available data were returned.')
         setLocations(locs); id = globalLocation.id; setLocation(id); setCountryFilter('global'); setAreaFilter('')
       }
+      if (id === 'ndvi_Canberra_Australia') { setData(null); return }
       const { data: d } = await api.get(`/api/dashboard/${id}`)
       setData(d)
     } catch (e) {
@@ -168,6 +170,7 @@ export default function App() {
   const fireAvailable = data?.fire?.available !== false
   const sourceColors = ['orange', 'green', 'blue', 'red']
   const selectedLocation = locations.find(l => l.id === location)
+  const ndviSelected = selectedLocation?.ndvi_pilot === true
   const countryLocations = locations.filter(l => l.scope === 'country')
   const selectedCountry = countryLocations.find(country => country.id === countryFilter)
   const isArea = area => area.scope === 'area' || area.scope === 'region'
@@ -195,7 +198,7 @@ export default function App() {
         <span className={`source-dot ${sourceColors[index % sourceColors.length]}`} />{source.indicator}
       </div>)}
       <div className="sidebar-bottom">
-        <div className="data-mode"><Database size={16} /><div><b>{data ? (data.source_mode === 'ARCHIVE' ? 'NASA historical archive' : data.source_mode === 'LIVE' ? 'Live NASA data' : data.source_mode === 'MIXED' ? 'Mixed live / mock' : 'Local demo mode') : 'Connecting…'}</b><small>{data ? `${data.sources.filter(s => s.source_mode !== 'UNAVAILABLE').length} available datasets` : ''}</small></div><span className="mode-dot" /></div>
+        <div className="data-mode"><Database size={16} /><div><b>{ndviSelected ? 'MODIS NDVI candidate' : data ? (data.source_mode === 'ARCHIVE' ? 'NASA historical archive' : data.source_mode === 'LIVE' ? 'Live NASA data' : data.source_mode === 'MIXED' ? 'Mixed live / mock' : 'Local demo mode') : 'Connecting…'}</b><small>{ndviSelected ? 'Canberra study area only' : data ? `${data.sources.filter(s => s.source_mode !== 'UNAVAILABLE').length} available datasets` : ''}</small></div><span className="mode-dot" /></div>
         <div className="profile"><div className="avatar">{initials(user.display_name)}</div><div><b>{user.display_name}</b><small>@{user.username}</small></div><button className="icon-btn" onClick={logout} title="Sign out"><LogOut size={15} /></button></div>
       </div>
     </aside>
@@ -204,7 +207,7 @@ export default function App() {
       <header className="topbar">
         <div className="top-left"><button className="menu-btn" onClick={() => setMenu(true)}><Menu size={19} /></button><div className="breadcrumb">Workspace › <b>{tabs.find(t => t.id === tab).label}</b></div></div>
         <div className="top-actions">
-          <div className="system-status"><span /> {error ? 'API unavailable' : 'All systems operational'}</div>
+          <div className="system-status"><span /> {ndviSelected ? 'MODIS vegetation workspace' : error ? 'API unavailable' : 'All systems operational'}</div>
           <button className="icon-btn" title="Account settings" onClick={() => setTab('settings')}><KeyRound size={17} /></button>
           <div className="top-avatar">{initials(user.display_name)}</div>
         </div>
@@ -265,7 +268,7 @@ export default function App() {
                       areaInputRef.current?.focus()
                     }
                   }}>
-                  <span>{l.name}</span><small>{l.cells ? `${l.cells} NASA grid cell${l.cells === 1 ? '' : 's'}` : 'No data available'}</small>
+                  <span>{l.name}</span><small>{l.ndvi_pilot ? 'MODIS NDVI study area' : l.cells ? `${l.cells} NASA grid cell${l.cells === 1 ? '' : 's'}` : 'No data available'}</small>
                 </button>)}
                 {!filteredAreas.length && <span className="area-search-empty">No local areas listed for this country</span>}
               </div>}
@@ -280,7 +283,15 @@ export default function App() {
 
         {tab === 'settings' && <Settings user={user} onUserChange={setUser} dataSource={dataSource} onReload={reload} reloading={loading} />}
 
-        {tab !== 'settings' && (loading && !data ? <div className="loading-panel"><div className="loader" /><b>Connecting to Earth observation datasets</b><span>Preparing environmental intelligence…</span></div> : selectedLocation?.cells === 0 ? <div className="loading-panel no-data-panel"><MapPin size={22} /><b>Selected area data not available</b><span>NASA archive has no grid data for {selectedLocation.name}. Choose another area or select Global.</span></div> : data && <>
+        {ndviSelected && (tab === 'overview' || tab === 'indicators') && <>
+          <NdviReview key={location} />
+          <div className="detail-grid">{['Temperature', 'Precipitation', 'Fire detection', 'Compound anomaly'].map(label => <section className="detail-card" key={label}><span className="eyebrow">{label}</span><h3>Unavailable for this study area</h3><p>No aligned observations are connected to this Canberra MODIS footprint. Other locations retain their existing data.</p></section>)}</div>
+        </>}
+        {ndviSelected && tab === 'hotspots' && <section className="detail-card"><h2>Compound hotspots unavailable</h2><p>Canberra NDVI is not combined with unrelated archive locations or time periods.</p></section>}
+        {ndviSelected && tab === 'methodology' && <section className="detail-card"><h2>Vegetation methodology</h2><p>MOD13Q1.061, QA-filtered seasonal matched-pixel comparison. Baseline: 2020-2024; evaluation: 2025. At least four historical observations per pixel and 80% matched coverage. Percentage change describes NDVI, not confirmed vegetation damage. Acquisition dates may cross the calendar-year boundary.</p></section>}
+        {!ndviSelected && tab === 'indicators' && <section className="detail-card"><div className="detail-icon"><Leaf size={20} /></div><span className="eyebrow">VEGETATION / MODIS NDVI</span><h3>Unavailable for this area</h3><p>MODIS NDVI is currently available only for Australia, then Canberra (MODIS study area). Soil wetness below is a separate indicator.</p></section>}
+
+        {tab !== 'settings' && !ndviSelected && (loading && !data ? <div className="loading-panel"><div className="loader" /><b>Connecting to Earth observation datasets</b><span>Preparing environmental intelligence…</span></div> : selectedLocation?.cells === 0 ? <div className="loading-panel no-data-panel"><MapPin size={22} /><b>Selected area data not available</b><span>NASA archive has no grid data for {selectedLocation.name}. Choose another area or select Global.</span></div> : data && <>
           <div className="overview-strip">
             <div className="location-block"><div className="location-icon"><MapPin size={18} /></div><div><small>SELECTED AREA</small><b>{data.location_name}</b><span>{fmt(Math.abs(data.center.lat), 4)}° {data.center.lat >= 0 ? 'N' : 'S'}&nbsp; {fmt(Math.abs(data.center.lon), 4)}° {data.center.lon >= 0 ? 'E' : 'W'}</span></div></div>
             <div className="strip-divider" />

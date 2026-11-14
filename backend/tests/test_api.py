@@ -40,6 +40,21 @@ def auth(c):
     return {"Authorization": f"Bearer {login(c).json()['access_token']}"}
 
 
+def test_canberra_catalog_is_separate_from_archive_cells(client, monkeypatch):
+    from routers import data
+    original = [{'id': 'country_Australia', 'scope': 'country', 'name': 'Australia', 'cells': 30}]
+    monkeypatch.setattr(data.dashboard, 'list_locations', lambda: list(original))
+    result = client.get('/api/locations', headers=auth(client))
+    assert result.status_code == 200
+    locations = result.json()
+    assert locations[0] == original[0]
+    pilot = locations[1]
+    assert pilot['country_id'] == 'country_Australia'
+    assert pilot['ndvi_pilot'] is True
+    assert pilot['cells'] == 0
+    assert pilot['available_indicators'] == ['ndvi']
+
+
 def test_default_login_and_protection(client):
     assert client.get("/api/dashboard/Sri_Lanka").status_code == 401
     r = login(client)

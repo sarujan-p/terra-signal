@@ -1,0 +1,21 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Canberra NDVI Study Area"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [149.0, -35.45],
+          [149.3, -35.45],
+          [149.3, -35.15],
+          [149.0, -35.15],
+          [149.0, -35.45]
+        ]]
+      }
+    }
+  ]
+}

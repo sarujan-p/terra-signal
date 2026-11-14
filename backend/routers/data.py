@@ -41,7 +41,16 @@ def _dash(location: str) -> dict:
 @router.get("/locations")
 def locations():
     try:
-        return dashboard.list_locations()
+        locations = dashboard.list_locations()
+        if any(item.get('id') == 'country_Australia' for item in locations):
+            locations.append({
+                'id': 'ndvi_Canberra_Australia', 'name': 'Canberra (MODIS study area)',
+                'display_name': 'Canberra, Australia', 'scope': 'area',
+                'country': 'Australia', 'country_id': 'country_Australia',
+                'lat': -35.3, 'lon': 149.15, 'cells': 0,
+                'ndvi_pilot': True, 'available_indicators': ['ndvi'],
+            })
+        return locations
     except DataError as e:
         raise HTTPException(503, f"Data source error: {e}")
 
